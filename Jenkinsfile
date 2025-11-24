@@ -62,17 +62,7 @@ spec:
             }
         }
 
-        stage('Push Base Image NGINX to Nexus (First Time Only)') {
-            steps {
-                container('dind') {
-                    sh '''
-                        docker pull nginx:alpine || true
-                        docker tag nginx:alpine nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/library/nginx:alpine
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/library/nginx:alpine
-                    '''
-                }
-            }
-        }
+       
 
         stage('Build Docker Image') {
             steps {
