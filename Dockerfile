@@ -1,5 +1,5 @@
 # Use NGINX base image stored inside YOUR Nexus hosted registry
-FROM nginx:alpine
+FROM nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/nginx:alpine
 
 # Remove default nginx website
 RUN rm -rf /usr/share/nginx/html/*
