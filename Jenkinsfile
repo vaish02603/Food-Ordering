@@ -65,10 +65,16 @@ spec:
         stage('Login to Docker Hub') {
             steps {
                 container('dind') {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                        sh '''
-                            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                        '''
+                    script {
+                        try {
+                            withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                                sh '''
+                                    echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                                '''
+                            }
+                        } catch (all) {
+                            echo 'Skipping Docker Hub login: credentialsId "dockerhub-creds" not found. Builds may hit Docker Hub rate limits.'
+                        }
                     }
                 }
             }
