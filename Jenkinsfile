@@ -34,7 +34,10 @@ spec:
 
   - name: dind
     image: docker:dind
-    args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
+    args: [
+      "--storage-driver=overlay2",
+      "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+    ]
     securityContext:
       privileged: true
     env:
@@ -55,7 +58,7 @@ spec:
             steps {
                 container('node') {
                     sh '''
-                        echo "Static HTML website — no build needed"
+                        echo "Static HTML website — no build required"
                         ls -la
                     '''
                 }
@@ -67,20 +70,17 @@ spec:
                 container('dind') {
                     script {
                         try {
-                            withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                                sh '''
+                            withCredentials([usernamePassword(
+                                credentialsId: 'dockerhub-creds',
+                                usernameVariable: 'DOCKERHUB_USER',
+                                passwordVariable: 'DOCKERHUB_PASS'
+                            )]) {
+                                sh """
                                     echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                                '''
+                                """
                             }
-                        } catch (all) {
-                            echo 'dockerhub-creds not found. Trying DH_USER/DH_PASS env fallback.'
-                            sh '''
-                                if [ -n "$DH_USER" ] && [ -n "$DH_PASS" ]; then \
-                                  echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin; \
-                                else \
-                                  echo "Skipping Docker Hub login: no creds available. Pulls may be rate limited."; \
-                                fi
-                            '''
+                        } catch (err) {
+                            echo 'Skipping Docker Hub login — creds not found.'
                         }
                     }
                 }
@@ -90,9 +90,16 @@ spec:
         stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
-                    sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u admin -p Changeme@2025
-                    '''
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-creds',
+                        usernameVariable: 'NEXUS_USER',
+                        passwordVariable: 'NEXUS_PASS'
+                    )]) {
+                        sh '''
+                            docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                                -u "$NEXUS_USER" -p "$NEXUS_PASS"
+                        '''
+                    }
                 }
             }
         }
@@ -101,7 +108,7 @@ spec:
             steps {
                 container('dind') {
                     sh '''
-                        sleep 10
+                        sleep 5
                         docker build -t food-ordering:latest .
                     '''
                 }
@@ -124,25 +131,15 @@ spec:
             }
         }
 
-        stage('Login to Nexus Registry') {
-            steps {
-                container('dind') {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                        sh '''
-                            docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                              -u $NEXUS_USER -p $NEXUS_PASS
-                        '''
-                    }
-                }
-            }
-        }
-
         stage('Push Docker Image to Nexus') {
             steps {
                 container('dind') {
                     sh '''
-                        docker tag food-ordering:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+                        docker tag food-ordering:latest \
+                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+
+                        docker push \
+                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
                     '''
                 }
             }
@@ -153,7 +150,7 @@ spec:
                 container('kubectl') {
                     sh '''
                         kubectl create namespace 2401048 || true
-                        kubectl get ns
+                        kubectl get namespaces
                     '''
                 }
             }
@@ -178,16 +175,16 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        echo "Listing pods:"
+                        echo "Pods in 2401048 namespace:"
                         kubectl get pods -n 2401048
 
-                        echo "Describing pod:"
                         POD=$(kubectl get pods -n 2401048 -o jsonpath="{.items[0].metadata.name}")
+
+                        echo "Describing pod: $POD"
                         kubectl describe pod $POD -n 2401048 | head -n 300
                     '''
                 }
             }
         }
-
     }
 }
