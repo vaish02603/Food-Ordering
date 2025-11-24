@@ -87,28 +87,12 @@ spec:
             }
         }
 
-        stage('Login to Nexus Registry (pre-build)') {
+        stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
-                    script {
-                        try {
-                            withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                                sh '''
-                                    docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                                      -u $NEXUS_USER -p $NEXUS_PASS
-                                '''
-                            }
-                        } catch (all) {
-                            echo 'nexus-creds not found. Trying NEXUS_USER/NEXUS_PASS env fallback.'
-                            sh '''
-                                if [ -n "$NEXUS_USER" ] && [ -n "$NEXUS_PASS" ]; then \
-                                  docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u "$NEXUS_USER" -p "$NEXUS_PASS"; \
-                                else \
-                                  echo "Skipping Nexus login: no creds available. Ensure hosted repo allows anonymous pull or add credentials."; \
-                                fi
-                            '''
-                        }
-                    }
+                    sh '''
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u admin -p Changeme@2025
+                    '''
                 }
             }
         }
