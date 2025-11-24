@@ -55,9 +55,20 @@ spec:
             steps {
                 container('node') {
                     sh '''
-                        echo "No build required — static HTML website"
-                        echo "Listing project files..."
+                        echo "Static HTML website — no build needed"
                         ls -la
+                    '''
+                }
+            }
+        }
+
+        stage('Push Base Image NGINX to Nexus (First Time Only)') {
+            steps {
+                container('dind') {
+                    sh '''
+                        docker pull nginx:alpine || true
+                        docker tag nginx:alpine nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/library/nginx:alpine
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/library/nginx:alpine
                     '''
                 }
             }
@@ -79,10 +90,10 @@ spec:
                 container('sonar-scanner') {
                     sh '''
                         sonar-scanner \
-                          -Dsonar.projectKey=2401048-food\
+                          -Dsonar.projectKey=2401048-food \
                           -Dsonar.sources=. \
                           -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                          -Dsonar.login=sqp_e5eafae11fc3f0cf3bd677e0763b65e45bd69a6d
+                          -Dsonar.token=sqp_e5eafae11fc3f0cf3bd677e0763b65e45bd69a6d
                     '''
                 }
             }
@@ -111,30 +122,25 @@ spec:
         }
 
         stage('Create Namespace') {
-    steps {
-        container('kubectl') {
-            sh '''
-                echo "Creating namespace 2401048 if not exists..."
-                kubectl create namespace 2401048 || echo "Namespace already exists"
-                kubectl get ns
-            '''
+            steps {
+                container('kubectl') {
+                    sh '''
+                        kubectl create namespace 2401048 || true
+                        kubectl get ns
+                    '''
+                }
+            }
         }
-    }
-}
-
 
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
                     sh '''
-                        set -x
-                        ls -la
                         ls -la k8s
 
                         kubectl apply -f k8s/deployment.yaml -n 2401048
                         kubectl apply -f k8s/service.yaml -n 2401048
 
-                        kubectl get all -n 2401048
                         kubectl rollout status deployment/food-ordering-deployment -n 2401048
                     '''
                 }
@@ -145,14 +151,16 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        echo "[DEBUG] Listing Pods..."
+                        echo "Listing pods:"
                         kubectl get pods -n 2401048
 
-                        echo "[DEBUG] Describing Pods..."
-                        kubectl describe pods -n 2401048 | head -n 200
+                        echo "Describing pod:"
+                        POD=$(kubectl get pods -n 2401048 -o jsonpath="{.items[0].metadata.name}")
+                        kubectl describe pod $POD -n 2401048 | head -n 300
                     '''
                 }
             }
         }
+
     }
 }
