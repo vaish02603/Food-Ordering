@@ -143,19 +143,21 @@ spec:
             }
         }
 
-        stage('Debug Pods') {
-            steps {
-                container('kubectl') {
-                    sh '''
-                        echo "[DEBUG] Listing Pods..."
-                        kubectl get pods -n 2401048
+       stage('Debug Pods') {
+    steps {
+        container('kubectl') {
+            sh '''
+                echo "[DEBUG] Listing pods..."
+                kubectl get pods -n 2401048
 
-                        echo "[DEBUG] Describing Pods..."
-                        kubectl describe pods -n 2401048 | head -n 200
-                    '''
-                }
-            }
+                echo "[DEBUG] Describing the pod..."
+                POD=$(kubectl get pods -n 2401048 -o jsonpath="{.items[0].metadata.name}")
+                kubectl describe pod $POD -n 2401048
+            '''
         }
+    }
+}
+
 
     }
 }
