@@ -73,7 +73,14 @@ spec:
                                 '''
                             }
                         } catch (all) {
-                            echo 'Skipping Docker Hub login: credentialsId "dockerhub-creds" not found. Builds may hit Docker Hub rate limits.'
+                            echo 'dockerhub-creds not found. Trying DH_USER/DH_PASS env fallback.'
+                            sh '''
+                                if [ -n "$DH_USER" ] && [ -n "$DH_PASS" ]; then \
+                                  echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin; \
+                                else \
+                                  echo "Skipping Docker Hub login: no creds available. Pulls may be rate limited."; \
+                                fi
+                            '''
                         }
                     }
                 }
@@ -83,11 +90,24 @@ spec:
         stage('Login to Nexus Registry (pre-build)') {
             steps {
                 container('dind') {
-                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
-                        sh '''
-                            docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                              -u $NEXUS_USER -p $NEXUS_PASS
-                        '''
+                    script {
+                        try {
+                            withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                                sh '''
+                                    docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                                      -u $NEXUS_USER -p $NEXUS_PASS
+                                '''
+                            }
+                        } catch (all) {
+                            echo 'nexus-creds not found. Trying NEXUS_USER/NEXUS_PASS env fallback.'
+                            sh '''
+                                if [ -n "$NEXUS_USER" ] && [ -n "$NEXUS_PASS" ]; then \
+                                  docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u "$NEXUS_USER" -p "$NEXUS_PASS"; \
+                                else \
+                                  echo "Skipping Nexus login: no creds available. Ensure hosted repo allows anonymous pull or add credentials."; \
+                                fi
+                            '''
+                        }
                     }
                 }
             }
