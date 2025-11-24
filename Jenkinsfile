@@ -78,13 +78,15 @@ spec:
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=2401048-food \
-                          -Dsonar.sources=. \
-                          -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                          -Dsonar.token=sqp_e5eafae11fc3f0cf3bd677e0763b65e45bd69a6d
-                    '''
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            sonar-scanner \
+                              -Dsonar.projectKey=2401048-food \
+                              -Dsonar.sources=. \
+                              -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                              -Dsonar.token=$SONAR_TOKEN
+                        '''
+                    }
                 }
             }
         }
@@ -92,10 +94,12 @@ spec:
         stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
-                    sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          -u admin -p Changeme@2025
-                    '''
+                    withCredentials([usernamePassword(credentialsId: 'nexus-creds', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                        sh '''
+                            docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                              -u $NEXUS_USER -p $NEXUS_PASS
+                        '''
+                    }
                 }
             }
         }
