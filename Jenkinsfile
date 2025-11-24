@@ -79,7 +79,7 @@ spec:
                 container('sonar-scanner') {
                     sh '''
                         sonar-scanner \
-                          -Dsonar.projectKey=2401048-food \
+                          -Dsonar.projectKey=2401048-food\
                           -Dsonar.sources=. \
                           -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
                           -Dsonar.login=sqp_e5eafae11fc3f0cf3bd677e0763b65e45bd69a6d
@@ -110,20 +110,18 @@ spec:
             }
         }
 
-        /* -------------------------
-           CREATE NAMESPACE STAGE
-           ------------------------- */
         stage('Create Namespace') {
-            steps {
-                container('kubectl') {
-                    sh '''
-                        echo "Creating namespace 2401048 if not exists..."
-                        kubectl create namespace 2401048 || echo "Namespace already exists"
-                        kubectl get ns
-                    '''
-                }
-            }
+    steps {
+        container('kubectl') {
+            sh '''
+                echo "Creating namespace 2401048 if not exists..."
+                kubectl create namespace 2401048 || echo "Namespace already exists"
+                kubectl get ns
+            '''
         }
+    }
+}
+
 
         stage('Deploy to Kubernetes') {
             steps {
@@ -143,21 +141,18 @@ spec:
             }
         }
 
-       stage('Debug Pods') {
-    steps {
-        container('kubectl') {
-            sh '''
-                echo "[DEBUG] Listing pods..."
-                kubectl get pods -n 2401048
+        stage('Debug Pods') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "[DEBUG] Listing Pods..."
+                        kubectl get pods -n 2401048
 
-                echo "[DEBUG] Describing the pod..."
-                POD=$(kubectl get pods -n 2401048 -o jsonpath="{.items[0].metadata.name}")
-                kubectl describe pod $POD -n 2401048
-            '''
+                        echo "[DEBUG] Describing Pods..."
+                        kubectl describe pods -n 2401048 | head -n 200
+                    '''
+                }
+            }
         }
-    }
-}
-
-
     }
 }
