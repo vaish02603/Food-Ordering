@@ -34,7 +34,10 @@ spec:
 
   - name: dind
     image: docker:dind
-    args: ["--storage-driver=overlay2", "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"]
+    args: [
+      "--storage-driver=overlay2",
+      "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
+    ]
     securityContext:
       privileged: true
     env:
@@ -51,40 +54,12 @@ spec:
 
     stages {
 
-        stage('Prepare Static Website') {
+        stage('Install + Build Frontend') {
             steps {
                 container('node') {
                     sh '''
-                        echo "Static HTML website — no build needed"
-                        ls -la
-                    '''
-                }
-            }
-        }
-
-        stage('Login to Docker Hub') {
-            steps {
-                container('dind') {
-                    script {
-                        try {
-                            withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                                sh '''
-                                    echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                                '''
-                            }
-                        } catch (all) {
-                            echo 'Skipping Docker Hub login: credentialsId "dockerhub-creds" not found. Builds may hit Docker Hub rate limits.'
-                        }
-                    }
-                }
-            }
-        }
-
-         stage('Login to Nexus Registry') {
-            steps {
-                container('dind') {
-                    sh '''
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 -u admin -p Changeme@2025
+                        npm install
+                        npm run build
                     '''
                 }
             }
@@ -95,7 +70,7 @@ spec:
                 container('dind') {
                     sh '''
                         sleep 10
-                        docker build -t food-ordering:latest .
+                        docker build -t recipe-finder:latest .
                     '''
                 }
             }
@@ -104,37 +79,38 @@ spec:
         stage('SonarQube Analysis') {
             steps {
                 container('sonar-scanner') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                            sonar-scanner \
-                              -Dsonar.projectKey=2401048-food \
-                              -Dsonar.sources=. \
-                              -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                              -Dsonar.token=$SONAR_TOKEN
-                        '''
-                    }
-                }
-            }
-        }
-
-        
-        stage('Push Docker Image to Nexus') {
-            steps {
-                container('dind') {
                     sh '''
-                        docker tag food-ordering:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+                        sonar-scanner \
+                            -Dsonar.projectKey=2401063-ashutosh \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                            -Dsonar.login=sqp_fec0d2cd0d6849ed77e9d26ed8ae79e2a03b2844
                     '''
                 }
             }
         }
 
-        stage('Create Namespace') {
+        stage('Login to Nexus Registry') {
             steps {
-                container('kubectl') {
+                container('dind') {
                     sh '''
-                        kubectl create namespace 2401048 || true
-                        kubectl get ns
+                        echo "Logging into Nexus..."
+                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                          -u admin -p Changeme@2025
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Nexus') {
+            steps {
+                container('dind') {
+                    sh '''
+                        docker tag recipe-finder:latest \
+                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401063/recipe-finder:v1
+
+                        docker push \
+                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401063/recipe-finder:v1
                     '''
                 }
             }
@@ -144,31 +120,12 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        ls -la k8s
-
-                        kubectl apply -f k8s/deployment.yaml -n 2401048
-                        kubectl apply -f k8s/service.yaml -n 2401048
-
-                        kubectl rollout status deployment/food-ordering-deployment -n 2401048
+                        kubectl apply -f k8s/deployment.yaml -n 2401063
+                        kubectl get all -n 2401063
+                        kubectl rollout status deployment/recipe-finder-deployment -n 2401063
                     '''
                 }
             }
         }
-
-        stage('Debug Pods') {
-            steps {
-                container('kubectl') {
-                    sh '''
-                        echo "Listing pods:"
-                        kubectl get pods -n 2401048
-
-                        echo "Describing pod:"
-                        POD=$(kubectl get pods -n 2401048 -o jsonpath="{.items[0].metadata.name}")
-                        kubectl describe pod $POD -n 2401048 | head -n 300
-                    '''
-                }
-            }
-        }
-
     }
 }
