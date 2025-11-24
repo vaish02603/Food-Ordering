@@ -1,0 +1,45 @@
+# Node modules
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# Git files
+.git/
+.gitignore
+
+# Docker files
+Dockerfile
+Dockerfile.dev
+
+# Coverage reports
+coverage/
+coverage-*
+*.lcov
+
+# Markdown docs
+README.md
+*.md
+
+# Environment files (never include secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Test folders
+__tests__/
+__mocks__/
+

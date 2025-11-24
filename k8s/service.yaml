@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: food-ordering-service
+  namespace: "2401048"
+spec:
+  selector:
+    app: food-ordering
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
