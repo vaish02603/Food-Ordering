@@ -1,12 +1,11 @@
 pipeline {
     agent {
         kubernetes {
-            yaml '''
+            yaml """
 apiVersion: v1
 kind: Pod
 spec:
   containers:
-
   - name: node
     image: node:18
     command: ['cat']
@@ -34,10 +33,9 @@ spec:
 
   - name: dind
     image: docker:dind
-    args: [
-      "--storage-driver=overlay2",
-      "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
-    ]
+    args:
+      - "--storage-driver=overlay2"
+      - "--insecure-registry=nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085"
     securityContext:
       privileged: true
     env:
@@ -48,18 +46,19 @@ spec:
   - name: kubeconfig-secret
     secret:
       secretName: kubeconfig-secret
-'''
+"""
         }
     }
 
     stages {
 
-        stage('Install + Build Frontend') {
+        stage('Prepare Static Website') {
             steps {
                 container('node') {
                     sh '''
-                        npm install
-                        npm run build
+                        echo "No build required — static HTML website"
+                        echo "Listing project files..."
+                        ls -la
                     '''
                 }
             }
@@ -68,10 +67,37 @@ spec:
         stage('Build Docker Image') {
             steps {
                 container('dind') {
-                    sh '''
-                        sleep 10
-                        docker build -t recipe-finder:latest .
-                    '''
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DH_USER',
+                        passwordVariable: 'DH_PASS'
+                    )]) {
+                        sh '''
+                            echo "Waiting for Docker daemon to be ready..."
+
+                            # Try for ~60 seconds
+                            for i in $(seq 1 30); do
+                              if docker info >/dev/null 2>&1; then
+                                echo "Docker daemon is ready"
+                                break
+                              fi
+                              echo "Docker not ready yet, retrying in 2s... ($i/30)"
+                              sleep 2
+                            done
+
+                            # Final check – if still not ready, fail clearly
+                            if ! docker info >/dev/null 2>&1; then
+                              echo "Docker daemon is still not reachable. Failing build."
+                              exit 1
+                            fi
+
+                            echo "Logging in to Docker Hub to avoid rate limits..."
+                            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
+
+                            echo "Building Docker image..."
+                            docker build -t food-ordering:latest .
+                        '''
+                    }
                 }
             }
         }
@@ -81,10 +107,10 @@ spec:
                 container('sonar-scanner') {
                     sh '''
                         sonar-scanner \
-                            -Dsonar.projectKey=2401063-ashutosh \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
-                            -Dsonar.login=sqp_fec0d2cd0d6849ed77e9d26ed8ae79e2a03b2844
+                          -Dsonar.projectKey=2401048-food \
+                          -Dsonar.sources=. \
+                          -Dsonar.host.url=http://my-sonarqube-sonarqube.sonarqube.svc.cluster.local:9000 \
+                          -Dsonar.login=sqp_e5eafae11fc3f0cf3bd677e0763b65e45bd69a6d
                     '''
                 }
             }
@@ -93,24 +119,38 @@ spec:
         stage('Login to Nexus Registry') {
             steps {
                 container('dind') {
+                    withCredentials([usernamePassword(
+                        credentialsId: 'nexus-docker-creds',
+                        usernameVariable: 'REG_USER',
+                        passwordVariable: 'REG_PASS'
+                    )]) {
+                        sh '''
+                            echo "$REG_PASS" | docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
+                              -u "$REG_USER" --password-stdin
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image to Nexus') {
+            steps {
+                container('dind') {
                     sh '''
-                        echo "Logging into Nexus..."
-                        docker login nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085 \
-                          -u admin -p Changeme@2025
+                        docker tag food-ordering:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
                     '''
                 }
             }
         }
 
-        stage('Push to Nexus') {
+        stage('Create Namespace') {
             steps {
-                container('dind') {
+                container('kubectl') {
                     sh '''
-                        docker tag recipe-finder:latest \
-                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401063/recipe-finder:v1
-
-                        docker push \
-                          nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401063/recipe-finder:v1
+                        echo "Creating namespace 2401048 if not exists..."
+                        kubectl create namespace 2401048 || echo "Namespace already exists"
+                        kubectl get ns
                     '''
                 }
             }
@@ -120,12 +160,33 @@ spec:
             steps {
                 container('kubectl') {
                     sh '''
-                        kubectl apply -f k8s/deployment.yaml -n 2401063
-                        kubectl get all -n 2401063
-                        kubectl rollout status deployment/recipe-finder-deployment -n 2401063
+                        set -x
+                        ls -la
+                        ls -la k8s
+
+                        kubectl apply -f k8s/deployment.yaml -n 2401048
+                        kubectl apply -f k8s/service.yaml -n 2401048
+
+                        kubectl get all -n 2401086
+                        kubectl rollout status deployment/food-ordering-deployment -n 2401048
                     '''
                 }
             }
         }
+
+        stage('Debug Pods') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "[DEBUG] Listing Pods..."
+                        kubectl get pods -n 2401048
+
+                        echo "[DEBUG] Describing Pods..."
+                        kubectl describe pods -n 2401048 | head -n 200
+                    '''
+                }
+            }
+        }
+
     }
 }
