@@ -63,19 +63,20 @@ spec:
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                container('dind') {
-                    sh '''
-                        echo "Waiting for Docker daemon..."
-                        sleep 10
+      stage('Build Docker Image') {
+    steps {
+        container('dind') {
+            sh '''
+                echo "Waiting for Docker daemon..."
+                sleep 10
 
-                        echo "Building Docker image for static website..."
-                        docker build -t recipe-finder:latest .
-                    '''
-                }
-            }
+                echo "Building Docker image..."
+                docker build -t food-ordering:latest .
+            '''
         }
+    }
+}
+
 
         stage('SonarQube Analysis') {
             steps {
@@ -103,18 +104,19 @@ spec:
         }
 
         stage('Push to Nexus') {
-            steps {
-                container('dind') {
-                    sh '''
-                        echo "Tagging Docker image..."
-                        docker tag food-ordering:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+    steps {
+        container('dind') {
+            sh '''
+                echo "Tagging Docker image..."
+                docker tag food-ordering:latest nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
 
-                        echo "Pushing image to Nexus..."
-                        docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
-                    '''
-                }
-            }
+                echo "Pushing to Nexus..."
+                docker push nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
+            '''
         }
+    }
+}
+
 
         stage('Deploy to Kubernetes') {
             steps {
