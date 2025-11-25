@@ -18,5 +18,3 @@ spec:
         image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
         ports:
         - containerPort: 80
-      imagePullSecrets:
-      - name: nexus-secret
