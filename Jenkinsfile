@@ -134,5 +134,17 @@ spec:
                 }
             }
         }
+
+        stage('Debug Describe Pods') {
+    steps {
+        container('kubectl') {
+            sh '''
+                echo "DESCRIBING PODS..."
+                kubectl describe pods -n 2401048
+            '''
+        }
+    }
+}
+
     }
 }
