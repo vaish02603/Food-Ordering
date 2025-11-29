@@ -140,7 +140,7 @@ spec:
 
                         kubectl get all -n 2401048
 
-                        kubectl rollout status deployment/food-ordering-deployment -n 2401048
+                        
                     '''
                 }
             }
