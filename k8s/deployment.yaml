@@ -13,11 +13,13 @@ spec:
       labels:
         app: food-ordering
     spec:
+      imagePullSecrets:
+        -name: nexus-secret 
       containers:
-      - name: food-ordering
-        image: nexus-service-for-docker-hosted-registry.nexus.svc.cluster.local:8085/2401048/food-ordering:v1
-        ports:
-        - containerPort: 80
+        - name: food-ordering
+          image: 120.0.0.1:30085/2401048/food-ordering:v1
+          ports:
+            - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
@@ -30,6 +32,6 @@ spec:
     app: food-ordering
   ports:
     - protocol: TCP
-      port: 80          # Internal cluster port
-      targetPort: 80    # Pod container port
-      nodePort: 31086   # Host accessible port (FREE PORT)
+      port: 80 # Internal cluster port
+      targetPort: 80 # Pod container port
+      nodePort: 31086 # Host accessible port (FREE PORT)

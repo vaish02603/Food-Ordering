@@ -4,9 +4,11 @@ metadata:
   name: food-ordering-service
   namespace: "2401048"
 spec:
+  type: NodePort
   selector:
     app: food-ordering
   ports:
-    - port: 80
-      targetPort: 80
-  type: ClusterIP
+    - protocol: TCP
+      port: 80          # service port
+      targetPort: 80    # containerPort in pod
+      nodePort: 31086   # NodePort exposed on the node
