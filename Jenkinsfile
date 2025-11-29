@@ -129,6 +129,18 @@ spec:
             }
         }
 
+        /* 🔥 NEW STAGE ADDED BELOW */
+        stage('Create Namespace') {
+            steps {
+                container('kubectl') {
+                    sh '''
+                        echo "Ensuring namespace 2401048 exists..."
+                        kubectl get namespace 2401048 || kubectl create namespace 2401048
+                    '''
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
@@ -140,7 +152,7 @@ spec:
 
                         kubectl get all -n 2401048
 
-                        
+                       
                     '''
                 }
             }
